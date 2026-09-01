@@ -29,6 +29,18 @@ class _FailingResources:
     provider = _FailingProvider()
 
 
+class _TimeoutProvider:
+    name = "stub"
+
+    async def chat_completion(self, payload: dict) -> dict:
+        request = httpx.Request("POST", "https://api.openai.com/v1/chat/completions")
+        raise httpx.ReadTimeout("upstream too slow", request=request)
+
+
+class _TimeoutResources:
+    provider = _TimeoutProvider()
+
+
 @pytest.fixture
 def stub_resources():
     app.dependency_overrides[get_resources] = lambda: _StubResources()
@@ -43,6 +55,13 @@ def failing_resources():
     app.dependency_overrides.clear()
 
 
+@pytest.fixture
+def timeout_resources():
+    app.dependency_overrides[get_resources] = lambda: _TimeoutResources()
+    yield
+    app.dependency_overrides.clear()
+
+
 async def test_chat_completions_returns_provider_response(client, stub_resources) -> None:
     response = await client.post("/v1/chat/completions", json={"model": "gpt-4", "messages": []})
     assert response.status_code == 200
@@ -53,3 +72,8 @@ async def test_chat_completions_surfaces_upstream_error_status(client, failing_r
     response = await client.post("/v1/chat/completions", json={"model": "gpt-4", "messages": []})
     assert response.status_code == 400
     assert response.json()["detail"]["error"]["message"] == "bad request"
+
+
+async def test_chat_completions_returns_504_on_upstream_timeout(client, timeout_resources) -> None:
+    response = await client.post("/v1/chat/completions", json={"model": "gpt-4", "messages": []})
+    assert response.status_code == 504

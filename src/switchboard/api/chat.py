@@ -1,16 +1,18 @@
 import httpx
 from fastapi import APIRouter, HTTPException
 
-from switchboard.api.deps import ResourcesDep
+from switchboard.api.deps import ProviderDep
 
 router = APIRouter(tags=["chat"])
 
 
 @router.post("/v1/chat/completions")
-async def chat_completions(payload: dict, resources: ResourcesDep) -> dict:
+async def chat_completions(payload: dict, provider: ProviderDep) -> dict:
     try:
-        return await resources.provider.chat_completion(payload)
+        return await provider.chat_completion(payload)
     except httpx.HTTPStatusError as exc:
         raise HTTPException(
             status_code=exc.response.status_code, detail=exc.response.json()
         ) from exc
+    except httpx.TimeoutException as exc:
+        raise HTTPException(status_code=504, detail="upstream request timed out") from exc
