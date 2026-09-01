@@ -4,6 +4,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from switchboard.core.config import Settings
+from switchboard.providers.base import Provider
 
 
 @dataclass(slots=True)
@@ -12,7 +13,9 @@ class Resources:
     engine: AsyncEngine
     sessionmaker: async_sessionmaker[AsyncSession]
     redis: Redis
+    provider: Provider
 
     async def close(self) -> None:
         await self.redis.aclose()
         await self.engine.dispose()
+        await self.provider.aclose()
