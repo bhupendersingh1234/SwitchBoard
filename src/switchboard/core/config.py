@@ -13,6 +13,9 @@ class Settings(BaseSettings):
     db_max_overflow: int = 5
     redis_url: str = "redis://localhost:6379/0"
     readiness_timeout_s: float = 2.0
+    openai_api_key: str = ""
+    openai_base_url: str = "https://api.openai.com/v1"
+    provider_timeout_s: float = 20.0
 
 
 @lru_cache
