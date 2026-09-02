@@ -21,6 +21,16 @@ services:
       timeout: 3s
       retries: 20
 
+  migrate:
+      build:
+        context: .
+        dockerfile: deploy/Dockerfile
+      command: ["alembic", "upgrade", "head"]
+      environment:
+        SB_DATABASE_URL: postgresql+asyncpg://switchboard:switchboard@postgres:5432/switchboard
+      depends_on:
+        postgres: {condition: service_healthy}
+
   api:
     build:
       context: .
@@ -28,7 +38,10 @@ services:
     environment:
       SB_DATABASE_URL: postgresql+asyncpg://switchboard:switchboard@postgres:5432/switchboard
       SB_REDIS_URL: redis://redis:6379/0
+      SB_OPENAI_API_KEY: ${SB_OPENAI_API_KEY:-}
+      SB_OPENAI_BASE_URL: ${SB_OPENAI_BASE_URL:-https://api.openai.com/v1}
     ports: ["8000:8000"]
     depends_on:
       postgres: {condition: service_healthy}
       redis: {condition: service_healthy}
+      migrate: {condition: service_completed_successfully}
