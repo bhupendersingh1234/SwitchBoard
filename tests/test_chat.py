@@ -1,8 +1,11 @@
 import httpx
 import pytest
 
-from switchboard.api.deps import get_resources
+from switchboard.api.deps import get_current_tenant, get_resources
+from switchboard.db.models import Tenant
 from switchboard.main import app
+
+_FAKE_TENANT = Tenant(name="test-tenant")
 
 
 class _StubProvider:
@@ -44,6 +47,7 @@ class _TimeoutResources:
 @pytest.fixture
 def stub_resources():
     app.dependency_overrides[get_resources] = lambda: _StubResources()
+    app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     yield
     app.dependency_overrides.clear()
 
@@ -51,6 +55,7 @@ def stub_resources():
 @pytest.fixture
 def failing_resources():
     app.dependency_overrides[get_resources] = lambda: _FailingResources()
+    app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     yield
     app.dependency_overrides.clear()
 
@@ -58,6 +63,7 @@ def failing_resources():
 @pytest.fixture
 def timeout_resources():
     app.dependency_overrides[get_resources] = lambda: _TimeoutResources()
+    app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     yield
     app.dependency_overrides.clear()
 
