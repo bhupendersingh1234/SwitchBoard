@@ -32,3 +32,14 @@ class ApiKey(Base):
     )
     revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class Model(Base):
+    __tablename__ = "models"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    provider: Mapped[str] = mapped_column(String(50), nullable=False)
+    model_name: Mapped[str] = mapped_column(String(100), nullable=False, unique=True)
+    input_cost_per_mtok: Mapped[int] = mapped_column(nullable=False)
+    output_cost_per_mtok: Mapped[int] = mapped_column(nullable=False)
+    enabled: Mapped[bool] = mapped_column(nullable=False, default=True)
