@@ -5,6 +5,7 @@ from fastapi import FastAPI
 
 from switchboard.api.chat import router as chat_router
 from switchboard.api.health import router as health_router
+from switchboard.api.keys import router as keys_router
 from switchboard.cache.redis import build_redis
 from switchboard.core.config import get_settings
 from switchboard.core.logging import configure_logging
@@ -39,3 +40,4 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 app = FastAPI(title="Switchboard", lifespan=lifespan)
 app.include_router(health_router)
 app.include_router(chat_router)
+app.include_router(keys_router)
