@@ -1,7 +1,7 @@
 import uuid
-from datetime import datetime
+from datetime import date, datetime
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, func
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -61,3 +61,19 @@ class RequestRecord(Base):
     prompt_tokens: Mapped[int] = mapped_column(nullable=False)
     completion_tokens: Mapped[int] = mapped_column(nullable=False)
     cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False)
+
+
+class UsageDaily(Base):
+    __tablename__ = "usage_daily"
+
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), primary_key=True
+    )
+    day: Mapped[date] = mapped_column(Date, primary_key=True)
+    model_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("models.id"), primary_key=True
+    )
+    requests: Mapped[int] = mapped_column(nullable=False, default=0)
+    tokens_in: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    tokens_out: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+    cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)

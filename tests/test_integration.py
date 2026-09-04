@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 
 from switchboard.api.deps import get_current_tenant
 from switchboard.auth.keys import generate_api_key
-from switchboard.db.models import ApiKey, RequestRecord, Tenant
+from switchboard.db.models import ApiKey, RequestRecord, Tenant, UsageDaily
 from switchboard.main import app
 
 
@@ -72,6 +72,7 @@ async def test_full_app_records_usage_and_cost_for_real_request(live_client, db_
         assert record.cost_micros == 450
     finally:
         await db_session.execute(delete(RequestRecord).where(RequestRecord.tenant_id == tenant.id))
+        await db_session.execute(delete(UsageDaily).where(UsageDaily.tenant_id == tenant.id))
         await db_session.execute(delete(ApiKey).where(ApiKey.tenant_id == tenant.id))
         await db_session.execute(delete(Tenant).where(Tenant.id == tenant.id))
         await db_session.commit()
