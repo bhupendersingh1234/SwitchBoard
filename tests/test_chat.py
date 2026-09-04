@@ -1,11 +1,16 @@
 import httpx
 import pytest
 
-from switchboard.api.deps import get_current_tenant, get_resources
+from switchboard.api.deps import get_current_tenant, get_resources, get_session
 from switchboard.db.models import Tenant
 from switchboard.main import app
 
 _FAKE_TENANT = Tenant(name="test-tenant")
+
+
+class _NoOpSession:
+    async def scalar(self, *args, **kwargs):
+        raise RuntimeError("no database in this test")
 
 
 class _StubProvider:
@@ -48,6 +53,7 @@ class _TimeoutResources:
 def stub_resources():
     app.dependency_overrides[get_resources] = lambda: _StubResources()
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
+    app.dependency_overrides[get_session] = lambda: _NoOpSession()
     yield
     app.dependency_overrides.clear()
 
@@ -56,6 +62,7 @@ def stub_resources():
 def failing_resources():
     app.dependency_overrides[get_resources] = lambda: _FailingResources()
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
+    app.dependency_overrides[get_session] = lambda: _NoOpSession()
     yield
     app.dependency_overrides.clear()
 
@@ -64,6 +71,7 @@ def failing_resources():
 def timeout_resources():
     app.dependency_overrides[get_resources] = lambda: _TimeoutResources()
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
+    app.dependency_overrides[get_session] = lambda: _NoOpSession()
     yield
     app.dependency_overrides.clear()
 
