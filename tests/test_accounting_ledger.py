@@ -4,7 +4,7 @@ from datetime import UTC, datetime
 from sqlalchemy import delete, select
 
 from switchboard.accounting.ledger import record_usage
-from switchboard.db.models import RequestRecord, Tenant, UsageDaily
+from switchboard.db.models import Model, RequestRecord, Tenant, UsageDaily
 
 
 async def test_record_usage_creates_request_and_usage_daily_rows(db_session) -> None:
@@ -60,5 +60,40 @@ async def test_record_usage_accumulates_usage_daily_across_calls(db_session) -> 
     finally:
         await db_session.execute(delete(RequestRecord).where(RequestRecord.tenant_id == tenant.id))
         await db_session.execute(delete(UsageDaily).where(UsageDaily.tenant_id == tenant.id))
+        await db_session.execute(delete(Tenant).where(Tenant.id == tenant.id))
+        await db_session.commit()
+
+
+async def test_historical_cost_is_unaffected_by_later_price_changes(db_session) -> None:
+    tenant = Tenant(name=f"tenant-{uuid.uuid4()}")
+    model = Model(
+        provider="test",
+        model_name=f"test-model-{uuid.uuid4()}",
+        input_cost_per_mtok=100_000,
+        output_cost_per_mtok=200_000,
+    )
+    db_session.add_all([tenant, model])
+    await db_session.flush()
+
+    try:
+        record = await record_usage(
+            db_session,
+            tenant.id,
+            model.model_name,
+            {"prompt_tokens": 1000, "completion_tokens": 500},
+        )
+        assert record is not None
+        assert record.cost_micros == 200
+
+        model.input_cost_per_mtok = 999_999_999
+        model.output_cost_per_mtok = 999_999_999
+        await db_session.commit()
+
+        await db_session.refresh(record)
+        assert record.cost_micros == 200
+    finally:
+        await db_session.execute(delete(RequestRecord).where(RequestRecord.tenant_id == tenant.id))
+        await db_session.execute(delete(UsageDaily).where(UsageDaily.tenant_id == tenant.id))
+        await db_session.execute(delete(Model).where(Model.id == model.id))
         await db_session.execute(delete(Tenant).where(Tenant.id == tenant.id))
         await db_session.commit()
