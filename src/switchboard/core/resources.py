@@ -4,6 +4,7 @@ from redis.asyncio import Redis
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker
 
 from switchboard.core.config import Settings
+from switchboard.limits.bucket import TokenBucket
 from switchboard.providers.base import Provider
 
 
@@ -14,6 +15,7 @@ class Resources:
     sessionmaker: async_sessionmaker[AsyncSession]
     redis: Redis
     provider: Provider
+    rate_limiter: TokenBucket
 
     async def close(self) -> None:
         await self.redis.aclose()

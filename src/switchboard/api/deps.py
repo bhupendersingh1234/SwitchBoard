@@ -8,7 +8,7 @@ from switchboard.auth.tenancy import AuthenticationError, authenticate
 from switchboard.core.resources import Resources
 from switchboard.db.models import Tenant
 from switchboard.providers.base import Provider
-
+from switchboard.limits.rate_limit import RateLimitExceeded, enforce_rpm_limit
 
 def get_resources(request: Request) -> Resources:
     resources: Resources | None = getattr(request.app.state, "resources", None)
@@ -46,3 +46,17 @@ async def get_current_tenant(
 
 
 CurrentTenantDep = Annotated[Tenant, Depends(get_current_tenant)]
+
+
+async def check_rate_limit(tenant: CurrentTenantDep, resources: ResourcesDep) -> None:
+    try:
+        await enforce_rpm_limit(resources.rate_limiter, tenant.id, resources.settings.rpm_limit)
+    except RateLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="rate limit exceeded",
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        ) from exc
+
+
+RateLimitDep = Annotated[None, Depends(check_rate_limit)]

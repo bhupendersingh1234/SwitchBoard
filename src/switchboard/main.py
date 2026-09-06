@@ -12,13 +12,14 @@ from switchboard.core.logging import configure_logging
 from switchboard.core.resources import Resources
 from switchboard.db.session import build_engine, build_sessionmaker
 from switchboard.providers.openai import OpenAIProvider
-
+from switchboard.limits.bucket import TokenBucket
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     settings = get_settings()
     configure_logging(settings.log_level)
     engine = build_engine(settings)
+    redis = build_redis(settings)
     app.state.resources = Resources(
         settings=settings,
         engine=engine,
@@ -29,6 +30,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
             api_key=settings.openai_api_key,
             timeout_s=settings.provider_timeout_s,
         ),
+        rate_limiter=TokenBucket(redis),
     )
     try:
         yield

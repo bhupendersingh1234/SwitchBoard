@@ -4,7 +4,7 @@ import httpx
 from fastapi import APIRouter, HTTPException
 
 from switchboard.accounting.ledger import record_usage
-from switchboard.api.deps import CurrentTenantDep, ProviderDep, SessionDep
+from switchboard.api.deps import CurrentTenantDep, ProviderDep, SessionDep, RateLimitDep
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -12,7 +12,7 @@ router = APIRouter(tags=["chat"])
 
 @router.post("/v1/chat/completions")
 async def chat_completions(
-    payload: dict, tenant: CurrentTenantDep, provider: ProviderDep, session: SessionDep
+    payload: dict, tenant: CurrentTenantDep, _rate_limit: RateLimitDep, provider: ProviderDep, session: SessionDep
 ) -> dict:
     try:
         response = await provider.chat_completion(payload)

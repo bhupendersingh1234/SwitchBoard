@@ -1,7 +1,7 @@
 import httpx
 import pytest
 
-from switchboard.api.deps import get_current_tenant, get_resources, get_session
+from switchboard.api.deps import check_rate_limit, get_current_tenant, get_resources, get_session
 from switchboard.db.models import Tenant
 from switchboard.main import app
 
@@ -54,6 +54,7 @@ def stub_resources():
     app.dependency_overrides[get_resources] = lambda: _StubResources()
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     app.dependency_overrides[get_session] = lambda: _NoOpSession()
+    app.dependency_overrides[check_rate_limit] = lambda: None
     yield
     app.dependency_overrides.clear()
 
@@ -63,6 +64,7 @@ def failing_resources():
     app.dependency_overrides[get_resources] = lambda: _FailingResources()
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     app.dependency_overrides[get_session] = lambda: _NoOpSession()
+    app.dependency_overrides[check_rate_limit] = lambda: None
     yield
     app.dependency_overrides.clear()
 
@@ -72,6 +74,7 @@ def timeout_resources():
     app.dependency_overrides[get_resources] = lambda: _TimeoutResources()
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     app.dependency_overrides[get_session] = lambda: _NoOpSession()
+    app.dependency_overrides[check_rate_limit] = lambda: None
     yield
     app.dependency_overrides.clear()
 
