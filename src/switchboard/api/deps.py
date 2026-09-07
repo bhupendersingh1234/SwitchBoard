@@ -7,8 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from switchboard.auth.tenancy import AuthenticationError, authenticate
 from switchboard.core.resources import Resources
 from switchboard.db.models import Tenant
+from switchboard.limits.rate_limit import (
+    RateLimitExceeded,
+    enforce_rpm_limit,
+    estimate_request_tokens,
+    reserve_tpm_budget,
+)
 from switchboard.providers.base import Provider
-from switchboard.limits.rate_limit import RateLimitExceeded, enforce_rpm_limit
+
 
 def get_resources(request: Request) -> Resources:
     resources: Resources | None = getattr(request.app.state, "resources", None)
@@ -60,3 +66,23 @@ async def check_rate_limit(tenant: CurrentTenantDep, resources: ResourcesDep) ->
 
 
 RateLimitDep = Annotated[None, Depends(check_rate_limit)]
+
+
+async def reserve_tpm(payload: dict, tenant: CurrentTenantDep, resources: ResourcesDep) -> int:
+    estimated_tokens = estimate_request_tokens(
+        payload, resources.settings.default_completion_estimate
+    )
+    try:
+        await reserve_tpm_budget(
+            resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
+        )
+    except RateLimitExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            detail="token budget exceeded",
+            headers={"Retry-After": str(exc.retry_after_seconds)},
+        ) from exc
+    return estimated_tokens
+
+
+EstimatedTokensDep = Annotated[int, Depends(reserve_tpm)]

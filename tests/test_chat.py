@@ -1,7 +1,14 @@
 import httpx
 import pytest
 
-from switchboard.api.deps import check_rate_limit, get_current_tenant, get_resources, get_session
+from switchboard.api.deps import (
+    check_rate_limit,
+    get_current_tenant,
+    get_resources,
+    get_session,
+    reserve_tpm,
+)
+from switchboard.core.config import get_settings
 from switchboard.db.models import Tenant
 from switchboard.main import app
 
@@ -13,6 +20,11 @@ class _NoOpSession:
         raise RuntimeError("no database in this test")
 
 
+class _NoOpRateLimiter:
+    async def refund(self, *args, **kwargs):
+        pass
+
+
 class _StubProvider:
     name = "stub"
 
@@ -22,6 +34,8 @@ class _StubProvider:
 
 class _StubResources:
     provider = _StubProvider()
+    settings = get_settings()
+    rate_limiter = _NoOpRateLimiter()
 
 
 class _FailingProvider:
@@ -35,6 +49,8 @@ class _FailingProvider:
 
 class _FailingResources:
     provider = _FailingProvider()
+    settings = get_settings()
+    rate_limiter = _NoOpRateLimiter()
 
 
 class _TimeoutProvider:
@@ -47,6 +63,8 @@ class _TimeoutProvider:
 
 class _TimeoutResources:
     provider = _TimeoutProvider()
+    settings = get_settings()
+    rate_limiter = _NoOpRateLimiter()
 
 
 @pytest.fixture
@@ -55,6 +73,7 @@ def stub_resources():
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     app.dependency_overrides[get_session] = lambda: _NoOpSession()
     app.dependency_overrides[check_rate_limit] = lambda: None
+    app.dependency_overrides[reserve_tpm] = lambda: 100
     yield
     app.dependency_overrides.clear()
 
@@ -65,6 +84,7 @@ def failing_resources():
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     app.dependency_overrides[get_session] = lambda: _NoOpSession()
     app.dependency_overrides[check_rate_limit] = lambda: None
+    app.dependency_overrides[reserve_tpm] = lambda: 100
     yield
     app.dependency_overrides.clear()
 
@@ -75,6 +95,7 @@ def timeout_resources():
     app.dependency_overrides[get_current_tenant] = lambda: _FAKE_TENANT
     app.dependency_overrides[get_session] = lambda: _NoOpSession()
     app.dependency_overrides[check_rate_limit] = lambda: None
+    app.dependency_overrides[reserve_tpm] = lambda: 100
     yield
     app.dependency_overrides.clear()
 
