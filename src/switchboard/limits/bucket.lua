@@ -18,7 +18,7 @@ tokens = math.min(capacity, tokens + elapsed * refill_per_second)
 
 local allowed = 0
 if tokens >= cost then
-    tokens = tokens - cost
+    tokens = math.min(capacity, tokens - cost)
     allowed = 1
 end
 

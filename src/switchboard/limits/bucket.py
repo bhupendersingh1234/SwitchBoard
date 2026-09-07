@@ -16,3 +16,8 @@ class TokenBucket:
             keys=[key], args=[capacity, refill_per_second, now, cost]
         )
         return bool(int(allowed)), float(remaining)
+
+    async def refund(
+        self, key: str, capacity: int, refill_per_second: float, now: float, amount: int
+    ) -> None:
+        await self.consume(key, capacity, refill_per_second, now, cost=-amount)

@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     openai_base_url: str = "https://api.openai.com/v1"
     provider_timeout_s: float = 20.0
     rpm_limit: int = 60
+    tpm_limit: int = 100_000
+    default_completion_estimate: int = 512
 
 
 @lru_cache

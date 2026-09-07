@@ -66,3 +66,28 @@ async def test_naive_get_then_set_overadmits_under_concurrency(redis: Redis) -> 
     results = await asyncio.gather(*[_naive_consume(redis, key, capacity) for _ in range(50)])
     admitted = sum(1 for allowed in results if allowed)
     assert admitted > capacity
+
+
+async def test_refund_returns_tokens_to_the_bucket(redis: Redis) -> None:
+    bucket = TokenBucket(redis)
+    key = f"bucket:{uuid.uuid4()}"
+
+    await bucket.consume(key, capacity=100, refill_per_second=0, now=1000.0, cost=60)
+    await bucket.refund(key, capacity=100, refill_per_second=0, now=1000.0, amount=25)
+
+    allowed, remaining = await bucket.consume(
+        key, capacity=100, refill_per_second=0, now=1000.0, cost=65
+    )
+    assert allowed is True
+    assert remaining == 0.0
+
+
+async def test_refund_cannot_push_above_capacity(redis: Redis) -> None:
+    bucket = TokenBucket(redis)
+    key = f"bucket:{uuid.uuid4()}"
+
+    await bucket.consume(key, capacity=100, refill_per_second=0, now=1000.0, cost=10)
+    await bucket.refund(key, capacity=100, refill_per_second=0, now=1000.0, amount=50)
+
+    _, remaining = await bucket.consume(key, capacity=100, refill_per_second=0, now=1000.0, cost=0)
+    assert remaining == 100.0
