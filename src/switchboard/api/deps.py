@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from switchboard.auth.tenancy import AuthenticationError, authenticate
 from switchboard.core.resources import Resources
 from switchboard.db.models import Tenant
+from switchboard.limits.budget import BudgetExceeded, enforce_budget
 from switchboard.limits.rate_limit import (
     RateLimitExceeded,
     enforce_rpm_limit,
@@ -52,6 +53,19 @@ async def get_current_tenant(
 
 
 CurrentTenantDep = Annotated[Tenant, Depends(get_current_tenant)]
+
+
+async def check_budget(tenant: CurrentTenantDep, session: SessionDep) -> None:
+    try:
+        await enforce_budget(session, tenant.id, tenant.monthly_budget_micros)
+    except BudgetExceeded as exc:
+        raise HTTPException(
+            status_code=status.HTTP_402_PAYMENT_REQUIRED,
+            detail="monthly budget exceeded",
+        ) from exc
+
+
+BudgetDep = Annotated[None, Depends(check_budget)]
 
 
 async def check_rate_limit(tenant: CurrentTenantDep, resources: ResourcesDep) -> None:

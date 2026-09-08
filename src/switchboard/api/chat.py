@@ -5,6 +5,7 @@ from fastapi import APIRouter, HTTPException
 
 from switchboard.accounting.ledger import record_usage
 from switchboard.api.deps import (
+    BudgetDep,
     CurrentTenantDep,
     EstimatedTokensDep,
     ProviderDep,
@@ -22,6 +23,7 @@ router = APIRouter(tags=["chat"])
 async def chat_completions(
     payload: dict,
     tenant: CurrentTenantDep,
+    _budget: BudgetDep,
     _rate_limit: RateLimitDep,
     estimated_tokens: EstimatedTokensDep,
     provider: ProviderDep,
