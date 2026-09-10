@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     rpm_limit: int = 60
     tpm_limit: int = 100_000
     default_completion_estimate: int = 512
+    provider_max_retries: int = 3
+    provider_failure_threshold: int = 5
+    provider_recovery_timeout: float = 30.0
 
 
 @lru_cache

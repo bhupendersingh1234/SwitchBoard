@@ -14,9 +14,33 @@ from switchboard.api.deps import (
     SessionDep,
 )
 from switchboard.limits.rate_limit import refund_tpm_budget
+from switchboard.resilience.breaker import CircuitOpenError
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
+
+_PROVIDER_ERRORS = (
+    httpx.HTTPStatusError,
+    httpx.TimeoutException,
+    httpx.ConnectError,
+    CircuitOpenError,
+)
+
+
+def _classify_provider_error(
+    exc: Exception, recovery_timeout: float
+) -> tuple[int, object, dict[str, str]]:
+    if isinstance(exc, httpx.HTTPStatusError):
+        return exc.response.status_code, exc.response.json(), {}
+    if isinstance(exc, httpx.TimeoutException):
+        return 504, "upstream request timed out", {}
+    if isinstance(exc, httpx.ConnectError):
+        return 502, "could not reach upstream provider", {}
+    return (
+        503,
+        "upstream provider is temporarily unavailable",
+        {"Retry-After": str(int(recovery_timeout))},
+    )
 
 
 @router.post("/v1/chat/completions")
@@ -32,18 +56,14 @@ async def chat_completions(
 ) -> dict:
     try:
         response = await provider.chat_completion(payload)
-    except httpx.HTTPStatusError as exc:
+    except _PROVIDER_ERRORS as exc:
         await refund_tpm_budget(
             resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
         )
-        raise HTTPException(
-            status_code=exc.response.status_code, detail=exc.response.json()
-        ) from exc
-    except httpx.TimeoutException as exc:
-        await refund_tpm_budget(
-            resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
+        status_code, detail, headers = _classify_provider_error(
+            exc, resources.settings.provider_recovery_timeout
         )
-        raise HTTPException(status_code=504, detail="upstream request timed out") from exc
+        raise HTTPException(status_code=status_code, detail=detail, headers=headers) from exc
 
     usage = response.get("usage", {})
     actual_tokens = usage.get("total_tokens", estimated_tokens)

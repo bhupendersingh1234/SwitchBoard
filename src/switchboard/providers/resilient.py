@@ -15,10 +15,17 @@ _RETRYABLE = (httpx.TimeoutException, httpx.ConnectError, ProviderServerError)
 
 
 class ResilientProvider(Provider):
-    def __init__(self, wrapped: Provider, *, breaker: CircuitBreaker | None = None) -> None:
+    def __init__(
+        self,
+        wrapped: Provider,
+        *,
+        breaker: CircuitBreaker | None = None,
+        max_attempts: int = 3,
+    ) -> None:
         self.name = wrapped.name
         self._wrapped = wrapped
         self._breaker = breaker or CircuitBreaker()
+        self._max_attempts = max_attempts
 
     async def _attempt(self, payload: dict) -> dict:
         async def call_wrapped() -> dict:
@@ -33,7 +40,11 @@ class ResilientProvider(Provider):
 
     async def chat_completion(self, payload: dict) -> dict:
         try:
-            return await retry_with_jitter(lambda: self._attempt(payload), retryable=_RETRYABLE)
+            return await retry_with_jitter(
+                lambda: self._attempt(payload),
+                retryable=_RETRYABLE,
+                max_attempts=self._max_attempts,
+            )
         except ProviderServerError as exc:
             raise exc.original from exc
 

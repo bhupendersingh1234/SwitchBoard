@@ -13,6 +13,8 @@ from switchboard.core.resources import Resources
 from switchboard.db.session import build_engine, build_sessionmaker
 from switchboard.providers.openai import OpenAIProvider
 from switchboard.limits.bucket import TokenBucket
+from switchboard.resilience.breaker import CircuitBreaker
+from switchboard.providers.resilient import ResilientProvider
 
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
@@ -25,10 +27,17 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         engine=engine,
         sessionmaker=build_sessionmaker(engine),
         redis=build_redis(settings),
-        provider=OpenAIProvider(
-            base_url=settings.openai_base_url,
-            api_key=settings.openai_api_key,
-            timeout_s=settings.provider_timeout_s,
+                provider=ResilientProvider(
+            OpenAIProvider(
+                base_url=settings.openai_base_url,
+                api_key=settings.openai_api_key,
+                timeout_s=settings.provider_timeout_s,
+            ),
+            breaker=CircuitBreaker(
+                failure_threshold=settings.provider_failure_threshold,
+                recovery_timeout=settings.provider_recovery_timeout,
+            ),
+            max_attempts=settings.provider_max_retries,
         ),
         rate_limiter=TokenBucket(redis),
     )
