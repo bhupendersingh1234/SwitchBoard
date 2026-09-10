@@ -22,6 +22,8 @@ class Settings(BaseSettings):
     provider_max_retries: int = 3
     provider_failure_threshold: int = 5
     provider_recovery_timeout: float = 30.0
+    backup_openai_base_url: str | None = None
+    backup_openai_api_key: str | None = None
 
 
 @lru_cache
