@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     backup_openai_api_key: str | None = None
     enable_hedging: bool = False
     hedge_delay_s: float = 0.15
+    request_deadline_s: float = 10.0
 
 
 @lru_cache

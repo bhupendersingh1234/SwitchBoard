@@ -15,6 +15,7 @@ from switchboard.api.deps import (
 )
 from switchboard.limits.rate_limit import refund_tpm_budget
 from switchboard.resilience.breaker import CircuitOpenError
+from switchboard.resilience.timeouts import DeadlineExceeded, with_deadline
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -24,6 +25,7 @@ _PROVIDER_ERRORS = (
     httpx.TimeoutException,
     httpx.ConnectError,
     CircuitOpenError,
+    DeadlineExceeded,
 )
 
 
@@ -32,6 +34,8 @@ def _classify_provider_error(
 ) -> tuple[int, object, dict[str, str]]:
     if isinstance(exc, httpx.HTTPStatusError):
         return exc.response.status_code, exc.response.json(), {}
+    if isinstance(exc, DeadlineExceeded):
+        return 504, "request deadline exceeded", {}
     if isinstance(exc, httpx.TimeoutException):
         return 504, "upstream request timed out", {}
     if isinstance(exc, httpx.ConnectError):
@@ -55,7 +59,10 @@ async def chat_completions(
     resources: ResourcesDep,
 ) -> dict:
     try:
-        response = await provider.chat_completion(payload)
+        response = await with_deadline(
+            lambda: provider.chat_completion(payload),
+            deadline_s=resources.settings.request_deadline_s,
+        )
     except _PROVIDER_ERRORS as exc:
         await refund_tpm_budget(
             resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
