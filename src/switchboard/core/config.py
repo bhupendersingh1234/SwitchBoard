@@ -24,6 +24,8 @@ class Settings(BaseSettings):
     provider_recovery_timeout: float = 30.0
     backup_openai_base_url: str | None = None
     backup_openai_api_key: str | None = None
+    enable_hedging: bool = False
+    hedge_delay_s: float = 0.15
 
 
 @lru_cache

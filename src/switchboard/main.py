@@ -17,6 +17,7 @@ from switchboard.providers.failover import FailoverProvider
 from switchboard.providers.openai import OpenAIProvider
 from switchboard.providers.resilient import ResilientProvider
 from switchboard.resilience.breaker import CircuitBreaker
+from switchboard.providers.hedged import HedgedProvider
 
 
 def _build_resilient(base_url: str, api_key: str, settings: Settings) -> ResilientProvider:
@@ -36,6 +37,8 @@ def _build_provider(settings: Settings) -> Provider:
         backup = _build_resilient(
             settings.backup_openai_base_url, settings.backup_openai_api_key, settings
         )
+        if settings.enable_hedging:
+            return HedgedProvider(primary, backup, hedge_delay=settings.hedge_delay_s)
         return FailoverProvider([primary, backup])
     return primary
 
