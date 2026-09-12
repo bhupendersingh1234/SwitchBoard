@@ -100,14 +100,18 @@ async def _stream_chat_completions(
             log.exception("stream failed after first chunk, ending early")
             yield b"data: [DONE]\n\n"
         finally:
-            # Runs on normal completion, on the except above, AND on a client
-            # disconnect (asyncio closes this generator, which raises GeneratorExit
-            # here) - proven separately, since a finally block may safely await
-            # cleanup work in all three cases but may not yield a new value when
-            # handling GeneratorExit specifically. A fresh session is opened here
-            # rather than reusing the request's injected one, since this may be
-            # running during request teardown and I'd rather not depend on exactly
-            # when FastAPI closes that session relative to this cleanup.
+            # Closing the outer generator does NOT automatically close the inner
+            # provider stream it's iterating - I verified this directly. Without
+            # this explicit close, the inner generator (and the real HTTP
+            # connection to the upstream inside it) would only get cleaned up
+            # eventually, whenever garbage collection happens to finalize it -
+            # not deterministically, and not what "cancels the upstream call"
+            # actually requires.
+            try:
+                await stream.aclose()
+            except Exception:
+                log.exception("failed to close upstream stream cleanly")
+
             if usage:
                 remaining = estimated_tokens - usage.get("total_tokens", estimated_tokens)
                 if remaining > 0:
@@ -140,7 +144,9 @@ async def chat_completions(
     resources: ResourcesDep,
 ) -> dict | StreamingResponse:
     if payload.get("stream"):
-        return await _stream_chat_completions(payload, tenant, estimated_tokens, provider, resources)
+        return await _stream_chat_completions(
+            payload, tenant, estimated_tokens, provider, resources
+        )
 
     try:
         response = await with_deadline(
