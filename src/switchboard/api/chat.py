@@ -58,6 +58,7 @@ async def _stream_chat_completions(
     provider: ProviderDep,
     resources: ResourcesDep,
 ) -> StreamingResponse:
+    payload = {**payload, "stream_options": {"include_usage": True}}
     stream = provider.stream_chat_completion(payload)
     start = time.monotonic()
 
@@ -79,18 +80,50 @@ async def _stream_chat_completions(
     ttft_ms = int((time.monotonic() - start) * 1000)
     log.info("stream ttft", extra={"ttft_ms": ttft_ms, "tenant_id": str(tenant.id)})
 
+    model_name = payload.get("model", "")
+
     async def event_generator() -> AsyncIterator[bytes]:
-        if first_chunk is not None:
-            yield f"data: {json.dumps(first_chunk)}\n\n".encode()
+        usage: dict = {}
         try:
+            if first_chunk is not None:
+                if first_chunk.get("usage"):
+                    usage = first_chunk["usage"]
+                yield f"data: {json.dumps(first_chunk)}\n\n".encode()
             async for chunk in stream:
+                if chunk.get("usage"):
+                    usage = chunk["usage"]
                 yield f"data: {json.dumps(chunk)}\n\n".encode()
+            yield b"data: [DONE]\n\n"
         except _PROVIDER_ERRORS:
             # A byte is already on the wire. We can't retry or change the status
             # code now - the only honest thing left to do is stop and log it.
             log.exception("stream failed after first chunk, ending early")
-        finally:
             yield b"data: [DONE]\n\n"
+        finally:
+            # Runs on normal completion, on the except above, AND on a client
+            # disconnect (asyncio closes this generator, which raises GeneratorExit
+            # here) - proven separately, since a finally block may safely await
+            # cleanup work in all three cases but may not yield a new value when
+            # handling GeneratorExit specifically. A fresh session is opened here
+            # rather than reusing the request's injected one, since this may be
+            # running during request teardown and I'd rather not depend on exactly
+            # when FastAPI closes that session relative to this cleanup.
+            if usage:
+                remaining = estimated_tokens - usage.get("total_tokens", estimated_tokens)
+                if remaining > 0:
+                    await refund_tpm_budget(
+                        resources.rate_limiter, tenant.id, resources.settings.tpm_limit, remaining
+                    )
+                try:
+                    async with resources.sessionmaker() as cleanup_session:
+                        await record_usage(cleanup_session, tenant.id, model_name, usage)
+                except Exception:
+                    log.exception("failed to record usage for stream")
+            else:
+                log.warning(
+                    "stream ended before usage was known, no cost recorded",
+                    extra={"tenant_id": str(tenant.id)},
+                )
 
     return StreamingResponse(event_generator(), media_type="text/event-stream")
 
