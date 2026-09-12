@@ -18,6 +18,9 @@ class _AlwaysFailsProvider(Provider):
             "simulated outage", request=httpx.Request("POST", "https://primary.example.com")
         )
 
+    def stream_chat_completion(self, payload: dict):
+        raise NotImplementedError("not exercised by these tests")
+
     async def aclose(self) -> None:
         pass
 
@@ -27,6 +30,9 @@ class _HealthyProvider(Provider):
 
     async def chat_completion(self, payload: dict) -> dict:
         return {"id": "chatcmpl-backup", "choices": []}
+
+    def stream_chat_completion(self, payload: dict):
+        raise NotImplementedError("not exercised by these tests")
 
     async def aclose(self) -> None:
         pass
@@ -38,6 +44,9 @@ class _AlwaysSlowProvider(Provider):
     async def chat_completion(self, payload: dict) -> dict:
         await asyncio.sleep(5.0)
         return {"id": "should never get here"}
+
+    def stream_chat_completion(self, payload: dict):
+        raise NotImplementedError("not exercised by these tests")
 
     async def aclose(self) -> None:
         pass

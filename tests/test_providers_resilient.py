@@ -28,6 +28,9 @@ class _ScriptedProvider(Provider):
             raise outcome
         return outcome
 
+    def stream_chat_completion(self, payload: dict):
+        raise NotImplementedError("not exercised by these tests")
+
     async def aclose(self) -> None:
         pass
 

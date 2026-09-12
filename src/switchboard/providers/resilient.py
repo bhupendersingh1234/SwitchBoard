@@ -1,5 +1,5 @@
+from collections.abc import AsyncIterator
 import httpx
-
 from switchboard.providers.base import Provider
 from switchboard.resilience.breaker import CircuitBreaker
 from switchboard.resilience.retry import retry_with_jitter
@@ -47,6 +47,14 @@ class ResilientProvider(Provider):
             )
         except ProviderServerError as exc:
             raise exc.original from exc
+
+    def stream_chat_completion(self, payload: dict) -> AsyncIterator[dict]:
+        # No retry or breaker wrapping here: once a chunk has been forwarded to the
+        # client, retrying the call would mean sending a second, different response
+        # after the first has already started. Streaming failures still matter for
+        # the breaker eventually, but that comes with real cancellation handling,
+        # not folded in here.
+        return self._wrapped.stream_chat_completion(payload)
 
     async def aclose(self) -> None:
         await self._wrapped.aclose()

@@ -1,5 +1,5 @@
+from collections.abc import AsyncIterator
 import httpx
-
 from switchboard.providers.base import Provider
 
 
@@ -26,6 +26,12 @@ class FailoverProvider(Provider):
                 last_exc = exc
         assert last_exc is not None
         raise last_exc
+
+    def stream_chat_completion(self, payload: dict) -> AsyncIterator[dict]:
+        # Only the first provider streams. Falling over to a second provider after
+        # the first has already sent chunks would produce a response that's the
+        # concatenation of two different completions - worse than just failing.
+        return self._providers[0].stream_chat_completion(payload)
 
     async def aclose(self) -> None:
         for provider in self._providers:

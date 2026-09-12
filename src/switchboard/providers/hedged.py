@@ -1,5 +1,5 @@
+from collections.abc import AsyncIterator
 import asyncio
-
 from switchboard.providers.base import Provider
 
 
@@ -33,6 +33,13 @@ class HedgedProvider(Provider):
         backup_exc = backup_task.exception()
         assert backup_exc is not None
         raise backup_exc
+
+    def stream_chat_completion(self, payload: dict) -> AsyncIterator[dict]:
+        # Racing two streams and cancelling the loser is exactly what HedgedProvider
+        # does for non-streaming calls, but here the "loser" might have already
+        # streamed several chunks to the client before losing the race. Only the
+        # primary streams for now.
+        return self._primary.stream_chat_completion(payload)
 
     async def aclose(self) -> None:
         await self._primary.aclose()
