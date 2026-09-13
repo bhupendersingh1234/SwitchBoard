@@ -5,6 +5,7 @@ from fastapi import APIRouter, Request, Response, status
 from sqlalchemy import text
 
 from switchboard.core.resources import Resources
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["ops"])
@@ -54,3 +55,8 @@ async def readyz(request: Request, response: Response) -> dict[str, object]:
     if not healthy:
         response.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
     return {"status": "ok" if healthy else "degraded", "checks": results}
+
+
+@router.get("/metrics")
+async def metrics() -> Response:
+    return Response(content=generate_latest(), media_type=CONTENT_TYPE_LATEST)

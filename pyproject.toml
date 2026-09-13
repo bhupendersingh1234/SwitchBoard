@@ -12,6 +12,7 @@ dependencies = [
     "redis>=5.2",
     "alembic>=1.14",
     "httpx>=0.28",
+    "prometheus-client>=0.20",
 ]
 
 [build-system]
