@@ -156,6 +156,13 @@ async def chat_completions(
     if is_cacheable(payload) and not bypass_cache:
         cache_key = compute_cache_key(tenant.id, payload)
         cached = await get_cached_response(resources.redis, cache_key)
+        log.info(
+            "cache lookup",
+            extra={
+                "cache_result": "hit" if cached is not None else "miss",
+                "tenant_id": str(tenant.id),
+            },
+        )
         if cached is not None:
             await refund_tpm_budget(
                 resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
