@@ -4,7 +4,7 @@ import time
 from collections.abc import AsyncIterator
 
 import httpx
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
 
 from switchboard.accounting.ledger import record_usage
@@ -17,6 +17,8 @@ from switchboard.api.deps import (
     ResourcesDep,
     SessionDep,
 )
+from switchboard.cache.exact import get_cached_response, set_cached_response
+from switchboard.cache.keys import compute_cache_key, is_cacheable
 from switchboard.limits.rate_limit import refund_tpm_budget
 from switchboard.resilience.breaker import CircuitOpenError
 from switchboard.resilience.timeouts import DeadlineExceeded, with_deadline
@@ -142,11 +144,23 @@ async def chat_completions(
     provider: ProviderDep,
     session: SessionDep,
     resources: ResourcesDep,
+    cache_control: str | None = Header(default=None),
 ) -> dict | StreamingResponse:
     if payload.get("stream"):
         return await _stream_chat_completions(
             payload, tenant, estimated_tokens, provider, resources
         )
+
+    bypass_cache = bool(cache_control) and "no-store" in cache_control
+    cache_key = None
+    if is_cacheable(payload) and not bypass_cache:
+        cache_key = compute_cache_key(tenant.id, payload)
+        cached = await get_cached_response(resources.redis, cache_key)
+        if cached is not None:
+            await refund_tpm_budget(
+                resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
+            )
+            return cached
 
     try:
         response = await with_deadline(
@@ -170,6 +184,11 @@ async def chat_completions(
             tenant.id,
             resources.settings.tpm_limit,
             estimated_tokens - actual_tokens,
+        )
+
+    if cache_key is not None:
+        await set_cached_response(
+            resources.redis, cache_key, response, ttl_s=resources.settings.cache_ttl_s
         )
 
     try:

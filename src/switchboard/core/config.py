@@ -27,6 +27,7 @@ class Settings(BaseSettings):
     enable_hedging: bool = False
     hedge_delay_s: float = 0.15
     request_deadline_s: float = 10.0
+    cache_ttl_s: int = 300
 
 
 @lru_cache
