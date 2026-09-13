@@ -19,6 +19,7 @@ from switchboard.providers.resilient import ResilientProvider
 from switchboard.resilience.breaker import CircuitBreaker
 from switchboard.providers.hedged import HedgedProvider
 from switchboard.observability.middleware import MetricsMiddleware, TraceIdMiddleware
+from switchboard.observability.tracing_setup import configure_tracing
 
 
 def _build_resilient(base_url: str, api_key: str, settings: Settings) -> ResilientProvider:
@@ -69,6 +70,7 @@ app = FastAPI(title="Switchboard", lifespan=lifespan)
 app.include_router(health_router)
 app.include_router(chat_router)
 app.include_router(keys_router)
+configure_tracing(app)
 #order matters here for these two middleware
 app.add_middleware(MetricsMiddleware)
 app.add_middleware(TraceIdMiddleware)

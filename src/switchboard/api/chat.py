@@ -22,6 +22,7 @@ from switchboard.cache.keys import compute_cache_key, is_cacheable
 from switchboard.limits.rate_limit import refund_tpm_budget
 from switchboard.resilience.breaker import CircuitOpenError
 from switchboard.resilience.timeouts import DeadlineExceeded, with_deadline
+from switchboard.observability.metrics import CACHE_HITS_TOTAL, CACHE_MISSES_TOTAL
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -156,6 +157,10 @@ async def chat_completions(
     if is_cacheable(payload) and not bypass_cache:
         cache_key = compute_cache_key(tenant.id, payload)
         cached = await get_cached_response(resources.redis, cache_key)
+        if cached is not None:
+            CACHE_HITS_TOTAL.inc()
+        else:
+            CACHE_MISSES_TOTAL.inc()
         log.info(
             "cache lookup",
             extra={

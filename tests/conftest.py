@@ -1,4 +1,5 @@
 import pytest
+from opentelemetry import trace
 from httpx import ASGITransport, AsyncClient
 
 from switchboard.core.config import get_settings
@@ -41,3 +42,9 @@ async def redis():
     yield r
     await r.flushdb()
     await r.aclose()
+
+
+@pytest.fixture(scope="session", autouse=True)
+def shutdown_tracing():
+    yield
+    trace.get_tracer_provider().shutdown()
