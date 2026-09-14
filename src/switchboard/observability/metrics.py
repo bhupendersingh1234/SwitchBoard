@@ -8,3 +8,4 @@ REQUEST_DURATION_SECONDS = Histogram(
 )
 CACHE_HITS_TOTAL = Counter("sb_cache_hits_total", "Total cache hits")
 CACHE_MISSES_TOTAL = Counter("sb_cache_misses_total", "Total cache misses")
+TTFT_SECONDS = Histogram("sb_ttft_seconds", "Time to first streamed token, in seconds")

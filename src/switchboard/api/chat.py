@@ -22,7 +22,7 @@ from switchboard.cache.keys import compute_cache_key, is_cacheable
 from switchboard.limits.rate_limit import refund_tpm_budget
 from switchboard.resilience.breaker import CircuitOpenError
 from switchboard.resilience.timeouts import DeadlineExceeded, with_deadline
-from switchboard.observability.metrics import CACHE_HITS_TOTAL, CACHE_MISSES_TOTAL
+from switchboard.observability.metrics import CACHE_HITS_TOTAL, CACHE_MISSES_TOTAL, TTFT_SECONDS
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -80,8 +80,9 @@ async def _stream_chat_completions(
         )
         raise HTTPException(status_code=status_code, detail=detail, headers=headers) from exc
 
-    ttft_ms = int((time.monotonic() - start) * 1000)
-    log.info("stream ttft", extra={"ttft_ms": ttft_ms, "tenant_id": str(tenant.id)})
+    ttft_s = time.monotonic() - start
+    TTFT_SECONDS.observe(ttft_s)
+    log.info("stream ttft", extra={"ttft_ms": int(ttft_s * 1000), "tenant_id": str(tenant.id)})
 
     model_name = payload.get("model", "")
 
