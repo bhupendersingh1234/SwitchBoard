@@ -6,6 +6,7 @@ from collections.abc import AsyncIterator
 import httpx
 from fastapi import APIRouter, Header, HTTPException
 from fastapi.responses import StreamingResponse
+from opentelemetry import trace
 
 from switchboard.accounting.ledger import record_usage
 from switchboard.api.deps import (
@@ -20,9 +21,15 @@ from switchboard.api.deps import (
 from switchboard.cache.exact import get_cached_response, set_cached_response
 from switchboard.cache.keys import compute_cache_key, is_cacheable
 from switchboard.limits.rate_limit import refund_tpm_budget
+from switchboard.observability.metrics import (
+    CACHE_HITS_TOTAL,
+    CACHE_MISSES_TOTAL,
+    CASCADE_ESCALATIONS_TOTAL,
+    TTFT_SECONDS,
+)
 from switchboard.resilience.breaker import CircuitOpenError
 from switchboard.resilience.timeouts import DeadlineExceeded, with_deadline
-from switchboard.observability.metrics import CACHE_HITS_TOTAL, CACHE_MISSES_TOTAL, TTFT_SECONDS
+from switchboard.routing.cascade import CascadeLeg
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -153,7 +160,7 @@ async def chat_completions(
             payload, tenant, estimated_tokens, provider, resources
         )
 
-    bypass_cache = bool(cache_control) and "no-store" in cache_control
+    bypass_cache = cache_control is not None and "no-store" in cache_control
     cache_key = None
     if is_cacheable(payload) and not bypass_cache:
         cache_key = compute_cache_key(tenant.id, payload)
@@ -175,11 +182,20 @@ async def chat_completions(
             )
             return cached
 
+    is_cascade = payload.get("model") == resources.settings.cascade_model_name
+
     try:
-        response = await with_deadline(
-            lambda: provider.chat_completion(payload),
-            deadline_s=resources.settings.request_deadline_s,
-        )
+        if is_cascade:
+            response, legs = await with_deadline(
+                lambda: resources.cascade_provider.chat_completion_with_legs(payload),
+                deadline_s=resources.settings.request_deadline_s,
+            )
+        else:
+            response = await with_deadline(
+                lambda: provider.chat_completion(payload),
+                deadline_s=resources.settings.request_deadline_s,
+            )
+            legs = [CascadeLeg(model=payload.get("model", ""), usage=response.get("usage", {}))]
     except _PROVIDER_ERRORS as exc:
         await refund_tpm_budget(
             resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
@@ -189,8 +205,19 @@ async def chat_completions(
         )
         raise HTTPException(status_code=status_code, detail=detail, headers=headers) from exc
 
-    usage = response.get("usage", {})
-    actual_tokens = usage.get("total_tokens", estimated_tokens)
+    if len(legs) > 1:
+        CASCADE_ESCALATIONS_TOTAL.inc()
+        trace.get_current_span().set_attribute("sb.cascade_escalated", True)
+        log.info(
+            "cascade escalated",
+            extra={
+                "tenant_id": str(tenant.id),
+                "cheap_model": legs[0].model,
+                "expensive_model": legs[-1].model,
+            },
+        )
+
+    actual_tokens = sum(leg.usage.get("total_tokens", 0) for leg in legs)
     if estimated_tokens > actual_tokens:
         await refund_tpm_budget(
             resources.rate_limiter,
@@ -204,9 +231,10 @@ async def chat_completions(
             resources.redis, cache_key, response, ttl_s=resources.settings.cache_ttl_s
         )
 
-    try:
-        await record_usage(session, tenant.id, payload.get("model", ""), usage)
-    except Exception:
-        log.exception("failed to record usage")
+    for leg in legs:
+        try:
+            await record_usage(session, tenant.id, leg.model, leg.usage)
+        except Exception:
+            log.exception("failed to record usage", extra={"model": leg.model})
 
     return response

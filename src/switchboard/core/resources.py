@@ -16,6 +16,7 @@ class Resources:
     redis: Redis
     provider: Provider
     rate_limiter: TokenBucket
+    cascade_provider: Provider
 
     async def close(self) -> None:
         await self.redis.aclose()

@@ -28,6 +28,9 @@ class Settings(BaseSettings):
     hedge_delay_s: float = 0.15
     request_deadline_s: float = 10.0
     cache_ttl_s: int = 300
+    cascade_model_name: str = "sb-cascade"
+    cascade_cheap_model: str = "gpt-4o-mini"
+    cascade_expensive_model: str = "gpt-4o"
 
 
 @lru_cache

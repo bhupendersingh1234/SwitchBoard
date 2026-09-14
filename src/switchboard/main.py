@@ -20,6 +20,7 @@ from switchboard.resilience.breaker import CircuitBreaker
 from switchboard.providers.hedged import HedgedProvider
 from switchboard.observability.middleware import MetricsMiddleware, TraceIdMiddleware
 from switchboard.observability.tracing_setup import configure_tracing
+from switchboard.routing.cascade import CascadeProvider
 
 
 def _build_resilient(base_url: str, api_key: str, settings: Settings) -> ResilientProvider:
@@ -51,12 +52,19 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     configure_logging(settings.log_level)
     engine = build_engine(settings)
     redis = build_redis(settings)
+    provider = _build_provider(settings)
+    cascade_provider = CascadeProvider(
+        provider,
+        cheap_model=settings.cascade_cheap_model,
+        expensive_model=settings.cascade_expensive_model,
+    )
     app.state.resources = Resources(
         settings=settings,
         engine=engine,
         sessionmaker=build_sessionmaker(engine),
         redis=redis,
-        provider=_build_provider(settings),
+        provider=provider,
+        cascade_provider=cascade_provider,
         rate_limiter=TokenBucket(redis),
     )
     try:
