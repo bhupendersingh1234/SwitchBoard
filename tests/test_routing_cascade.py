@@ -63,4 +63,36 @@ async def test_original_payload_fields_are_preserved_only_model_is_overridden() 
     await cascade.chat_completion(original)
 
     assert original == {"messages": [{"role": "user", "content": "hi"}], "temperature": 0.7}
-    
+
+
+async def test_non_escalated_response_has_exactly_one_leg() -> None:
+    wrapped = _RecordingProvider([_good_response()])
+    cascade = CascadeProvider(wrapped, cheap_model="gpt-4o-mini", expensive_model="gpt-4o")
+
+    response, legs = await cascade.chat_completion_with_legs(
+        {"messages": [{"role": "user", "content": "hi"}]}
+    )
+
+    assert response == _good_response()
+    assert len(legs) == 1
+    assert legs[0].model == "gpt-4o-mini"
+
+
+async def test_escalated_response_has_both_legs_with_correct_models_and_usage() -> None:
+    cheap = _bad_response()
+    cheap["usage"] = {"prompt_tokens": 10, "completion_tokens": 2}
+    expensive = _good_response()
+    expensive["usage"] = {"prompt_tokens": 10, "completion_tokens": 40}
+    wrapped = _RecordingProvider([cheap, expensive])
+    cascade = CascadeProvider(wrapped, cheap_model="gpt-4o-mini", expensive_model="gpt-4o")
+
+    response, legs = await cascade.chat_completion_with_legs(
+        {"messages": [{"role": "user", "content": "hi"}]}
+    )
+
+    assert response == expensive
+    assert len(legs) == 2
+    assert legs[0].model == "gpt-4o-mini"
+    assert legs[0].usage == {"prompt_tokens": 10, "completion_tokens": 2}
+    assert legs[1].model == "gpt-4o"
+    assert legs[1].usage == {"prompt_tokens": 10, "completion_tokens": 40}
