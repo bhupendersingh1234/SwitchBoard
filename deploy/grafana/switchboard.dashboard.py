@@ -74,11 +74,26 @@ cache_hit_ratio = TimeSeries(
     unit="percentunit",
 )
 
+cascade_escalation_ratio = TimeSeries(
+    title="Cascade escalation ratio",
+    targets=[
+        Target(
+            expr=(
+                "sum(rate(sb_cascade_escalations_total[5m])) "
+                "/ sum(rate(sb_cascade_requests_total[5m]))"
+            ),
+            legendFormat="escalation ratio",
+        )
+    ],
+    gridPos=GridPos(h=8, w=12, x=0, y=16),
+    unit="percentunit",
+)
+
 dashboard = Dashboard(
     title="Switchboard",
     description="RED metrics and cache performance for the Switchboard LLM gateway",
     tags=["switchboard"],
     timezone="utc",
-    panels=[request_rate, error_rate, latency_p99, cache_hit_ratio],
+    panels=[request_rate, error_rate, latency_p99, cache_hit_ratio, cascade_escalation_ratio],
     time=Time(start="now-6h", end="now"),
 ).auto_panel_ids()

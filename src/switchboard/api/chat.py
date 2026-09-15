@@ -25,6 +25,7 @@ from switchboard.observability.metrics import (
     CACHE_HITS_TOTAL,
     CACHE_MISSES_TOTAL,
     CASCADE_ESCALATIONS_TOTAL,
+    CASCADE_REQUESTS_TOTAL,
     TTFT_SECONDS,
 )
 from switchboard.resilience.breaker import CircuitOpenError
@@ -183,6 +184,8 @@ async def chat_completions(
             return cached
 
     is_cascade = payload.get("model") == resources.settings.cascade_model_name
+    if is_cascade:
+        CASCADE_REQUESTS_TOTAL.inc()
 
     try:
         if is_cascade:

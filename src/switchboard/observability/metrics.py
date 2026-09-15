@@ -10,3 +10,6 @@ TTFT_SECONDS = Histogram("sb_ttft_seconds", "Time to first streamed token, in se
 CASCADE_ESCALATIONS_TOTAL = Counter(
     "sb_cascade_escalations_total", "Total requests escalated from the cheap to the expensive model"
 )
+CASCADE_REQUESTS_TOTAL = Counter(
+    "sb_cascade_requests_total", "Total requests routed through the cascade"
+)

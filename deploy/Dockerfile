@@ -5,7 +5,8 @@ WORKDIR /app
 COPY pyproject.toml ./
 COPY src ./src
 COPY alembic.ini ./
-RUN pip install --no-cache-dir . && useradd --create-home --uid 10001 app
+RUN pip install --no-cache-dir --default-timeout=300 . \
+    && useradd --create-home --uid 10001 app
 
 USER app
 EXPOSE 8000
