@@ -42,3 +42,5 @@ jobs:
       - run: mypy
       - run: alembic upgrade head
       - run: pytest -q
+      - name: Eval report
+        run: python -m switchboard.evals.run

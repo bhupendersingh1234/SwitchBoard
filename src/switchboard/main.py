@@ -55,8 +55,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     provider = _build_provider(settings)
     cascade_provider = CascadeProvider(
         provider,
-        cheap_model=settings.cascade_cheap_model,
-        expensive_model=settings.cascade_expensive_model,
+        models=[settings.cascade_cheap_model, settings.cascade_expensive_model],
     )
     app.state.resources = Resources(
         settings=settings,
