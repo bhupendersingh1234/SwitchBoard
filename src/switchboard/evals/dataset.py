@@ -97,4 +97,23 @@ CASES: list[EvalCase] = [
         ),
         actually_good=False,
     ),
+    # Found by inspection, not assumption: len() counts characters, which is a
+    # poor proxy for informativeness outside English. A short, complete,
+    # correct CJK answer is exactly the kind of real failure mode the eval
+    # doc says to add when found - character count and information content
+    # diverge for languages where one character carries more meaning.
+    EvalCase(
+        "short_correct_cjk",
+        _response(
+            "东京是日本的首都。"
+        ),  # "Tokyo is the capital of Japan." - complete, correct, 9 chars
+        actually_good=True,
+    ),
+    # Same underlying problem, different domain: a short, complete, correct
+    # code answer penalized purely for being short.
+    EvalCase(
+        "short_correct_code",
+        _response("x = 5"),
+        actually_good=True,
+    ),
 ]

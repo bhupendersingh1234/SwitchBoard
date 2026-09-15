@@ -11,11 +11,11 @@ UNAMBIGUOUS_BAD_CASES = {
     "content_filtered",
 }
 
-# Measured on the current heuristic (M10). This is a floor, not a target -
-# if a change legitimately improves is_low_quality, raise this number to
-# match the new measured score. If a change lowers it, that's the regression
-# this gate exists to catch.
-MINIMUM_ACCURACY = 0.50
+# Measured on the current heuristic and dataset (M10, updated as the dataset
+# grew to 13 cases). This is a floor, not a target - if a change legitimately
+# improves is_low_quality, raise this number to match the new measured score.
+# If a change lowers it, that's the regression this gate exists to catch.
+MINIMUM_ACCURACY = 0.45
 
 
 def test_unambiguous_bad_cases_are_never_missed() -> None:
