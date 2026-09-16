@@ -1,8 +1,8 @@
 import uuid
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, String, func
-from sqlalchemy.dialects.postgresql import UUID
+from sqlalchemy import Boolean, BigInteger, Date, DateTime, ForeignKey, String, Text, func
+from sqlalchemy.dialects.postgresql import UUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column
 
 from switchboard.db.base import Base
@@ -81,3 +81,17 @@ class UsageDaily(Base):
     tokens_in: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     tokens_out: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
     cost_micros: Mapped[int] = mapped_column(BigInteger, nullable=False, default=0)
+
+
+class CascadeDecision(Base):
+    __tablename__ = "cascade_decisions"
+
+    id: Mapped[int] = mapped_column(primary_key=True, autoincrement=True)
+    tenant_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("tenants.id"), index=True
+    )
+    messages: Mapped[list] = mapped_column(JSONB)
+    response_content: Mapped[str] = mapped_column(Text)
+    tier_model: Mapped[str] = mapped_column(String)
+    was_low_quality: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(server_default=func.now())
