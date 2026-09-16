@@ -32,6 +32,7 @@ class Settings(BaseSettings):
     cascade_cheap_model: str = "gpt-4o-mini"
     cascade_expensive_model: str = "gpt-4o"
     collect_finetuning_data: bool = False
+    cascade_finetuned_model: str | None = None
 
 
 @lru_cache
