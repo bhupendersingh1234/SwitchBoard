@@ -31,6 +31,7 @@ from switchboard.observability.metrics import (
 from switchboard.resilience.breaker import CircuitOpenError
 from switchboard.resilience.timeouts import DeadlineExceeded, with_deadline
 from switchboard.routing.cascade import CascadeLeg
+from switchboard.routing.record import record_cascade_decision
 
 log = logging.getLogger(__name__)
 router = APIRouter(tags=["chat"])
@@ -198,7 +199,19 @@ async def chat_completions(
                 lambda: provider.chat_completion(payload),
                 deadline_s=resources.settings.request_deadline_s,
             )
-            legs = [CascadeLeg(model=payload.get("model", ""), usage=response.get("usage", {}))]
+            # was_low_quality is never actually evaluated for a non-cascade
+            # request - False here is a placeholder, not a claim that this
+            # response passed a check that never ran. It's never read: the
+            # fine-tuning recording loop below only fires when is_cascade.
+            legs = [
+                CascadeLeg(
+                    model=payload.get("model", ""),
+                    usage=response.get("usage", {}),
+                    response_content="",
+                    finish_reason="",
+                    was_low_quality=False,
+                )
+            ]
     except _PROVIDER_ERRORS as exc:
         await refund_tpm_budget(
             resources.rate_limiter, tenant.id, resources.settings.tpm_limit, estimated_tokens
@@ -239,5 +252,19 @@ async def chat_completions(
             await record_usage(session, tenant.id, leg.model, leg.usage)
         except Exception:
             log.exception("failed to record usage", extra={"model": leg.model})
+
+    if is_cascade and resources.settings.collect_finetuning_data:
+        for leg in legs:
+            try:
+                await record_cascade_decision(
+                    session,
+                    tenant_id=tenant.id,
+                    messages=payload.get("messages", []),
+                    response_content=leg.response_content,
+                    tier_model=leg.model,
+                    was_low_quality=leg.was_low_quality,
+                )
+            except Exception:
+                log.exception("failed to record cascade decision", extra={"model": leg.model})
 
     return response

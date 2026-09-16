@@ -108,6 +108,9 @@ async def test_non_escalated_response_has_exactly_one_leg() -> None:
     assert response == _good_response()
     assert len(legs) == 1
     assert legs[0].model == "tier-cheap"
+    assert legs[0].was_low_quality is False
+    assert legs[0].response_content == "A complete and reasonably detailed answer."
+    assert legs[0].finish_reason == "stop"
 
 
 async def test_three_tier_escalation_produces_a_leg_per_call_with_correct_usage() -> None:
@@ -127,6 +130,9 @@ async def test_three_tier_escalation_produces_a_leg_per_call_with_correct_usage(
     assert response == expensive
     assert [leg.model for leg in legs] == ["tier-cheap", "tier-mid", "tier-expensive"]
     assert [leg.usage["completion_tokens"] for leg in legs] == [2, 5, 40]
+    assert [leg.was_low_quality for leg in legs] == [True, True, False]
+    assert legs[-1].response_content == "A complete and reasonably detailed answer."
+    assert [leg.finish_reason for leg in legs] == ["stop", "stop", "stop"]
 
 
 async def test_original_payload_fields_are_preserved_only_model_is_overridden() -> None:

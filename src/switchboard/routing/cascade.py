@@ -9,6 +9,20 @@ from switchboard.routing.quality import is_low_quality
 class CascadeLeg:
     model: str
     usage: dict
+    response_content: str
+    finish_reason: str
+    was_low_quality: bool
+
+
+def _extract_content(response: dict) -> str:
+    choices = response.get("choices") or [{}]
+    choice = choices[0]
+    return (choice.get("message") or {}).get("content") or ""
+
+
+def _extract_finish_reason(response: dict) -> str:
+    choices = response.get("choices") or [{}]
+    return choices[0].get("finish_reason") or ""
 
 
 class CascadeProvider(Provider):
@@ -28,9 +42,18 @@ class CascadeProvider(Provider):
         legs: list[CascadeLeg] = []
         for i, model in enumerate(self._models):
             response = await self._wrapped.chat_completion({**payload, "model": model})
-            legs.append(CascadeLeg(model=model, usage=response.get("usage", {})))
+            low_quality = is_low_quality(response)
+            legs.append(
+                CascadeLeg(
+                    model=model,
+                    usage=response.get("usage", {}),
+                    response_content=_extract_content(response),
+                    finish_reason=_extract_finish_reason(response),
+                    was_low_quality=low_quality,
+                )
+            )
             is_last_tier = i == len(self._models) - 1
-            if is_last_tier or not is_low_quality(response):
+            if is_last_tier or not low_quality:
                 return response, legs
         raise AssertionError("unreachable: the loop above always returns on its last iteration")
 
