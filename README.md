@@ -123,12 +123,13 @@ Standalone docs, in `docs/`:
 
 ## What's deliberately not here
 
-No real fine-tuned model exists - there's no production traffic yet to
-train one on (`docs/finetuning.md`). No LLM-as-judge evaluation - the eval
-harness is rule-based on purpose, for a CI gate that needs to be fast, free,
-and deterministic (`docs/evals.md`). No queue or async processing - and so
-no queue-boundary context propagation problem to solve yet, though
-`docs/slo.md` names the design constraint for when one gets added. Naming
-these explicitly matters more here than it would elsewhere: this project's
-own discipline throughout has been to state a limitation precisely rather
-than let a demo imply more than what's actually been verified.
+No LLM-as-judge evaluation - the eval harness is rule-based on purpose, for
+a CI gate that needs to be fast, free, and deterministic (`docs/evals.md`).
+Beyond that, every other honest gap - no real fine-tuned model, no real
+production traffic to measure a real escalation rate from, the
+cascade-vs-classifier latency tradeoff left unmeasured, `load_test.py`
+outside the automated smoke coverage - is consolidated in one place rather
+than scattered: **`docs/future-work.md`**. This project's discipline
+throughout has been to state a limitation precisely rather than let a demo
+imply more than what's actually been verified; that file is where all of
+them live together.
