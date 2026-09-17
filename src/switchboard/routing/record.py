@@ -11,6 +11,7 @@ async def record_cascade_decision(
     tenant_id: uuid.UUID,
     messages: list[dict],
     response_content: str,
+    finish_reason: str,
     tier_model: str,
     was_low_quality: bool,
 ) -> None:
@@ -28,6 +29,7 @@ async def record_cascade_decision(
             tenant_id=tenant_id,
             messages=messages,
             response_content=response_content,
+            finish_reason=finish_reason,
             tier_model=tier_model,
             was_low_quality=was_low_quality,
         )

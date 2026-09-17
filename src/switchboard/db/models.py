@@ -92,6 +92,7 @@ class CascadeDecision(Base):
     )
     messages: Mapped[list] = mapped_column(JSONB)
     response_content: Mapped[str] = mapped_column(Text)
+    finish_reason: Mapped[str] = mapped_column(String, server_default="")
     tier_model: Mapped[str] = mapped_column(String)
     was_low_quality: Mapped[bool] = mapped_column(Boolean)
     created_at: Mapped[datetime] = mapped_column(server_default=func.now())

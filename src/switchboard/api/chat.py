@@ -261,6 +261,7 @@ async def chat_completions(
                     tenant_id=tenant.id,
                     messages=payload.get("messages", []),
                     response_content=leg.response_content,
+                    finish_reason=leg.finish_reason,
                     tier_model=leg.model,
                     was_low_quality=leg.was_low_quality,
                 )
