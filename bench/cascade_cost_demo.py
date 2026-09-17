@@ -5,70 +5,45 @@ real is_low_quality heuristic (M9) - not made-up numbers.
 Run: python bench/cascade_cost_demo.py
 """
 
-import random
-
 from switchboard.accounting.pricing import compute_cost_micros
 from switchboard.routing.quality import is_low_quality
-
-CHEAP_INPUT, CHEAP_OUTPUT = 150_000, 600_000  # gpt-4o-mini, micros per mtok
-EXPENSIVE_INPUT, EXPENSIVE_OUTPUT = 2_500_000, 10_000_000  # gpt-4o, micros per mtok
+from switchboard.routing.simulate import (
+    CHEAP_INPUT,
+    CHEAP_OUTPUT,
+    EXPENSIVE_INPUT,
+    EXPENSIVE_OUTPUT,
+    simulate_requests,
+)
 
 N_REQUESTS = 10_000
-# Escalation rate is an assumption, not measured data - there's no eval harness
-# yet (M10). 20% is a deliberately explicit, named guess: a minority of
-# real-world requests are hard enough that a cheap model gives an incomplete
-# or too-short answer, most aren't. This number is exactly what M10 exists to
-# replace with something measured.
 ASSUMED_HARD_REQUEST_RATE = 0.20
 
 
-def _simulate_request(rng: random.Random) -> tuple[int, int, bool]:
-    prompt_tokens = rng.randint(50, 500)
-    is_hard = rng.random() < ASSUMED_HARD_REQUEST_RATE
-    completion_tokens = rng.randint(20, 80) if is_hard else rng.randint(80, 300)
-    return prompt_tokens, completion_tokens, is_hard
-
-
-def _cheap_response_for(is_hard: bool, completion_tokens: int) -> dict:
-    # A "hard" request gets a short, unfinished-looking answer from the cheap
-    # model - which is exactly the signal is_low_quality is designed to catch.
-    content = (
-        ("short answer " * max(1, completion_tokens // 20))
-        if is_hard
-        else ("a complete and sufficiently detailed answer " * max(1, completion_tokens // 20))
-    )
-    finish_reason = "length" if is_hard else "stop"
-    return {"choices": [{"message": {"content": content}, "finish_reason": finish_reason}]}
-
-
 def main() -> None:
-    rng = random.Random(42)
+    requests = simulate_requests(N_REQUESTS, hard_request_rate=ASSUMED_HARD_REQUEST_RATE)
 
     always_expensive_micros = 0
     always_cheap_micros = 0
     cascade_micros = 0
     escalations = 0
 
-    for _ in range(N_REQUESTS):
-        prompt_tokens, completion_tokens, is_hard = _simulate_request(rng)
-
+    for req in requests:
         always_expensive_micros += compute_cost_micros(
-            prompt_tokens, completion_tokens, EXPENSIVE_INPUT, EXPENSIVE_OUTPUT
+            req.prompt_tokens, req.completion_tokens, EXPENSIVE_INPUT, EXPENSIVE_OUTPUT
         )
-        always_cheap_micros += compute_cost_micros(
-            prompt_tokens, completion_tokens, CHEAP_INPUT, CHEAP_OUTPUT
-        )
-
         cheap_cost = compute_cost_micros(
-            prompt_tokens, completion_tokens, CHEAP_INPUT, CHEAP_OUTPUT
+            req.prompt_tokens, req.completion_tokens, CHEAP_INPUT, CHEAP_OUTPUT
         )
+        always_cheap_micros += cheap_cost
         cascade_micros += cheap_cost
 
-        cheap_response = _cheap_response_for(is_hard, completion_tokens)
-        if is_low_quality(cheap_response):
+        response = {
+            "choices": [{"message": {"content": req.content}, "finish_reason": req.finish_reason}]
+        }
+        if is_low_quality(response):
             escalations += 1
             cascade_micros += compute_cost_micros(
-                prompt_tokens, completion_tokens, EXPENSIVE_INPUT, EXPENSIVE_OUTPUT
+                req.prompt_tokens, req.completion_tokens, EXPENSIVE_INPUT, EXPENSIVE_OUTPUT
             )
 
     def usd(micros: int) -> str:
