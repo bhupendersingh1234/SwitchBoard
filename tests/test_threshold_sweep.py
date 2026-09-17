@@ -30,4 +30,4 @@ def test_default_min_length_matches_the_measured_m10_baseline() -> None:
     points = sweep_min_length([20])
     point = points[0]
 
-    assert round(point.accuracy, 3) == round(6 / 13, 3)
+    assert round(point.accuracy, 3) == round(7 / 14, 3)

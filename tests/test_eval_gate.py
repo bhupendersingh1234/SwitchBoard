@@ -12,10 +12,14 @@ UNAMBIGUOUS_BAD_CASES = {
 }
 
 # Measured on the current heuristic and dataset (M10, updated as the dataset
-# grew to 13 cases). This is a floor, not a target - if a change legitimately
-# improves is_low_quality, raise this number to match the new measured score.
-# If a change lowers it, that's the regression this gate exists to catch.
-MINIMUM_ACCURACY = 0.45
+# grew to 14 cases in M12 - see short_unhelpful_hedge, added specifically to
+# check whether a lower min_length would trade false positives for false
+# negatives; it does, so the default stayed unchanged and this floor tracks
+# that unchanged default's real, current score). This is a floor, not a
+# target - if a change legitimately improves is_low_quality, raise this
+# number to match the new measured score. If a change lowers it, that's the
+# regression this gate exists to catch.
+MINIMUM_ACCURACY = 0.48
 
 
 def test_unambiguous_bad_cases_are_never_missed() -> None:

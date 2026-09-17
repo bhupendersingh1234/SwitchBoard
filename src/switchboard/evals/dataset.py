@@ -116,4 +116,14 @@ CASES: list[EvalCase] = [
         _response("x = 5"),
         actually_good=True,
     ),
+    # Found by inspection before lowering min_length, not after a real
+    # failure: every existing short-and-bad case is bad because it's
+    # truncated (finish_reason="length"). None test a short response that
+    # completed normally and is still genuinely useless - a hedge with
+    # finish_reason="stop" that a low min_length would let straight through.
+    EvalCase(
+        "short_unhelpful_hedge",
+        _response("I don't know."),
+        actually_good=False,
+    ),
 ]
